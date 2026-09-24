@@ -1,9 +1,10 @@
-const { number } = require("zod");
 const prisma = require("../databases/prisma");
 const AlunoInvalidoError = require("../errors/AlunoInvalidoError");
 const AlunoNaoEncontradoError = require("../errors/AlunoNaoEncontradoError");
+const AlunoDadosInvalidosError = require("../errors/AlunoDadoInvalidoError");
 
-class AlunoService{
+class AlunoService
+{
 
 
     async findUnique(id){
@@ -21,7 +22,6 @@ class AlunoService{
 
     return aluno;
     
-
     }
 
     async findMany(page, pageSize, orderBy, order){
@@ -56,6 +56,54 @@ class AlunoService{
 
         return novoAluno;
     }
+
+    async update(id,dados){
+        
+        // preciso tratar caso venha um objeto vazio.
+
+        if(!dados||(!dados.nome && !dados.email)){
+
+         throw new AlunoDadosInvalidosError();
+
+        }
+
+        const aluno = await prisma.aluno.findUnique({
+         where:{
+                id:Number(id)
+            } 
+        })
+        
+        if(!aluno){
+               
+          throw new AlunoNaoEncontradoError();
+
+        }
+
+        try{
+
+         const alunoAtualizado= await prisma.aluno.update({
+            where:{
+                id: Number(id)
+        },
+        data: dados
+        });
+
+        return alunoAtualizado;
+
+        }catch(e){
+
+    console.log("ERRO DO PRISMA:", e);
+    console.log("CODIGO DO ERRO:", e.code);
+
+    if(e.code === "P2002"){
+        
+        throw new AlunoDadosInvalidosError("Email já cadastrado");
+
+    }
+
+    throw e;
 }
 
+    }
+}   
 module.exports = new AlunoService();
