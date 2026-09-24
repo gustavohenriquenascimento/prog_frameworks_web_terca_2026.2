@@ -1,6 +1,18 @@
+const e = require("express");
 const alunoService = require("../services/AlunoService");
 
 class AlunoController{
+
+    async delete(request, response){
+    try{
+     const aluno = await alunoService.delete(request.params.id);
+     return response.status(200).send()
+    }catch(e){
+
+        return response.status(e.statusCode).json({error: e.message});
+    }
+
+    }
 
     async update(request, response){
       try{
@@ -33,7 +45,7 @@ class AlunoController{
         const resultado = await alunoService.findMany(page, pageSize, orderBy, order);
         return response.status(200).json({resultado});
     }
-    
+
 
     async create(request, response){
         try{
