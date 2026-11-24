@@ -1,93 +1,106 @@
-# Programação para Frameworks Web
+# Via Livre — Sistema de Locação de Veículos
 
-Este repositório contém os códigos e exemplos desenvolvidos durante a disciplina **Programação para Frameworks Web**, ministrada pelo professor **Thiago Rodrigues**.
+Aplicação de locação com API REST em Node.js, Express e Prisma, banco MySQL/MariaDB, autenticação JWT e interface React.
 
-## 🚀 Executando o projeto
+## Integrante
 
-Para executar o projeto em sua máquina, siga os passos abaixo.
+- Gustavo Henrique Nascimento Silva
 
-### 1. Clonar o repositório
+## Requisitos
 
-Clone este repositório utilizando o Git:
+- Node.js 20 ou superior e npm
+- MySQL ou MariaDB
 
-```bash
-git clone URL_DO_REPOSITORIO
-```
+## Configuração
 
-Em seguida, entre na pasta do projeto:
+1. Instale as dependências da API:
 
-```bash
-cd NOME_DO_PROJETO
-```
+   ```bash
+   npm install
+   ```
 
-### 2. Instalar as dependências
+2. Crie o arquivo local de ambiente (ou adicione as variáveis que faltarem ao `.env` local existente):
 
-Com o projeto na pasta, execute:
+   ```bash
+   copy .env.example .env
+   ```
 
-```bash
-npm install
-```
+   `DATABASE_URL` é usada pelo Prisma CLI. `DB_HOST`, `DB_USER`, `DB_PASSWORD` e `DB_NAME` configuram a conexão da aplicação.
+   `JWT_SECRET` deve ser um segredo aleatório com pelo menos 32 caracteres. Não compartilhe nem versione o arquivo `.env`.
 
-Esse comando irá instalar todas as dependências necessárias para executar o projeto.
+3. Gere o cliente Prisma e aplique as migrations:
 
-Depois,
+   ```bash
+   npx prisma generate
+   npx prisma migrate deploy
+   ```
 
-```bash
-npx prisma generate
-```
+4. Carregue veículos de demonstração no banco:
 
-Esse comando irá fazer o Prisma gerar o Prisma Client a partir do seu schema.prisma.
+   ```bash
+   npm run db:seed
+   ```
 
-### 3. Variáveis de Ambiente
+   O comando cria três veículos de exemplo e pode ser executado novamente sem sobrescrever dados existentes. Crie uma conta pela interface para demonstrar locações.
 
-> ⚠️ **Lembrete:** sempre que alterar o banco de dados, usuário, senha, porta ou ambiente de execução, **atualize as variáveis de ambiente abaixo**.
+5. Inicie a API:
 
-```env
-DATABASE_URL="mysql://root:thiago@localhost:3306/univ"
+   ```bash
+   npm run dev
+   ```
 
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=thiago
-DB_NAME=univ
+   A API usa a porta `3000` por padrão. `GET /health` confirma que o servidor HTTP está respondendo.
 
-PORT=3000
-```
+## Interface React
 
-#### Banco de Dados
-
-As variáveis abaixo devem corresponder às configurações do banco MySQL utilizado pela aplicação:
-
-* `DATABASE_URL` — URL de conexão com o banco.
-* `DB_HOST` — endereço do servidor MySQL.
-* `DB_USER` — usuário do banco.
-* `DB_PASSWORD` — senha do banco.
-* `DB_NAME` — nome do banco de dados.
-
-#### Servidor
-
-* `PORT` — porta utilizada pela aplicação.
-
-### ⚠️ Importante
-
-Ao clonar o projeto ou configurar um novo ambiente, verifique e **atualize essas variáveis antes de executar a aplicação**.
-
-### 4. Executar o projeto
-
-Após a instalação das dependências, execute o comando definido no projeto para iniciá-lo, por exemplo:
+Em outro terminal, instale e inicie o cliente:
 
 ```bash
-npm start
+npm install --prefix frontend
+npm run dev:frontend
 ```
 
-ou:
+Abra `http://localhost:5173`. A interface consome a API real, sem listas fixas de demonstração. O filtro inicia mostrando veículos disponíveis; os dados para demonstração podem ser carregados no banco com `npm run db:seed`. Se a API estiver em outro endereço, copie `frontend/.env.example` para `frontend/.env.local` e ajuste `VITE_API_URL`.
+
+## API
+
+Exceto cadastro e login, as rotas abaixo exigem `Authorization: Bearer <token>`. O token é emitido pelo login e representa o usuário autenticado. IDs de usuário não são aceitos como forma de escolher o proprietário de uma locação.
+
+| Método | Rota | Acesso | Descrição |
+|---|---|---|---|
+| `POST` | `/auth/register` | Público | Cadastra usuário com nome, e-mail e senha (mínimo 8 caracteres). |
+| `POST` | `/auth/login` | Público | Valida credenciais e retorna usuário e token JWT. |
+| `GET` | `/auth/me` | Autenticado | Retorna o perfil do usuário autenticado. |
+| `GET` | `/veiculos` | Autenticado | Lista veículos; aceita `?disponiveis=true` ou `?disponiveis=false`. Sem filtro, lista todos. |
+| `POST` | `/veiculos` | Autenticado | Cadastra veículo com marca, modelo, placa, ano e valor da diária. |
+| `POST` | `/locacoes` | Autenticado | Registra locação informando veículo e período; o usuário vem do token. |
+| `GET` | `/locacoes` | Autenticado | Lista o histórico do usuário autenticado com os veículos relacionados. |
+| `PATCH` | `/locacoes/:id/finalizar` | Autenticado | Finaliza locação própria e disponibiliza novamente o veículo. |
+| `GET` | `/health` | Público | Verifica se o servidor HTTP está ativo. |
+
+As respostas de erro usam JSON com `error` e `code`; erros de validação também podem incluir `details`. E-mails e placas são normalizados e únicos. Senhas são armazenadas com bcrypt e não aparecem em respostas.
+
+## Organização
+
+- `src/routes`: rotas HTTP e composição de middlewares.
+- `src/controllers`: entrada e resposta HTTP.
+- `src/services`: acesso ao Prisma e regras de negócio.
+- `src/schemas`: validação de payloads com Zod.
+- `src/middlewares`: autenticação, validação e tratamento de erros.
+- `prisma/schema.prisma` e `prisma/migrations`: modelo relacional e histórico versionado do banco.
+- `frontend/src`: interface e consumo da API com `fetch`.
+
+## Testes e build
 
 ```bash
-npm run dev
+npm test
+npm run build:frontend
 ```
 
-> **Observação:** O comando para iniciar o projeto pode variar de acordo com o projeto desenvolvido em aula. Consulte o `package.json` para verificar os scripts disponíveis.
+Os testes da API usam o executor nativo do Node.js. O build da interface verifica a compilação de produção do React.
 
----
+Para criar e versionar uma migration durante o desenvolvimento:
 
-**Disciplina:** Programação para Frameworks Web
-**Professor:** Thiago Rodrigues
+```bash
+npx prisma migrate dev --name nome_da_mudanca
+```

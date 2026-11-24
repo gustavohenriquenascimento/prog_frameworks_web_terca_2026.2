@@ -15,7 +15,7 @@ class VeiculoService {
 
     async findMany(disponiveis) {
         return prisma.veiculo.findMany({
-            where: disponiveis ? { disponivel: true } : undefined,
+            where: disponiveis === undefined ? undefined : { disponivel: disponiveis },
             orderBy: { id: "asc" }
         });
     }

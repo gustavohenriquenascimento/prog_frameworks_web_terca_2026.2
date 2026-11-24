@@ -1,18 +1,24 @@
 require('dotenv/config');
-const express = require("express")
-const veiculoRoutes = require("./routes/veiculoRoutes");
-const locacaoRoutes = require("./routes/locacaoRoutes");
+const createApp = require("./app");
+const prisma = require("./databases/prisma");
+const { validateEnvironment } = require("./config/environment");
 
-const app = express();
-app.use(express.json());
-app.use((request, response, next)=>{
-    console.log("Executando antes das rotas");
-    next();
-});
-app.use("/veiculos", veiculoRoutes);
-app.use("/locacoes", locacaoRoutes);
+const start = () => {
+    const { port } = validateEnvironment();
+    const app = createApp();
+    const server = app.listen(port, () => {
+        console.log(`API de locação disponível na porta ${port}.`);
+    });
 
-app.listen(process.env.PORT, ()=>{
-    console.log(`Server running on port ${process.env.PORT}`);
-});
+    server.on("close", () => {
+        prisma.$disconnect().catch((error) => {
+            console.error("Falha ao desconectar do banco de dados:", error);
+        });
+    });
+};
 
+if (require.main === module) {
+    start();
+}
+
+module.exports = { start };

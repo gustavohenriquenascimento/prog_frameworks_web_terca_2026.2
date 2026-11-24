@@ -8,7 +8,7 @@ const VeiculoNaoEncontradoError = require("../errors/VeiculoNaoEncontradoError")
 const milissegundosPorDia = 24 * 60 * 60 * 1000;
 
 class LocacaoService {
-    async create(dados) {
+    async create(usuarioId, dados) {
         const duracao = dados.dataPrevistaDevolucao.getTime() - dados.dataInicio.getTime();
         if (duracao <= 0) {
             throw new LocacaoDadoInvalidoError("A devolução prevista deve ser posterior ao início.");
@@ -18,7 +18,7 @@ class LocacaoService {
 
         return prisma.$transaction(async (transaction) => {
             const usuario = await transaction.usuario.findUnique({
-                where: { id: dados.usuarioId },
+                where: { id: usuarioId },
                 select: { id: true }
             });
             if (!usuario) {
@@ -30,6 +30,13 @@ class LocacaoService {
             });
             if (!veiculo) {
                 throw new VeiculoNaoEncontradoError();
+            }
+
+            const valorTotal = veiculo.valorDiaria
+                .mul(diarias)
+                .toDecimalPlaces(2);
+            if (valorTotal.gt("99999999.99")) {
+                throw new LocacaoDadoInvalidoError("O valor total da locação excede o limite permitido.");
             }
 
             const disponibilidade = await transaction.veiculo.updateMany({
@@ -46,7 +53,7 @@ class LocacaoService {
                     veiculoId: veiculo.id,
                     dataInicio: dados.dataInicio,
                     dataPrevistaDevolucao: dados.dataPrevistaDevolucao,
-                    valorTotal: veiculo.valorDiaria.mul(diarias).toDecimalPlaces(2),
+                    valorTotal,
                     status: "ATIVA"
                 },
                 include: {
@@ -72,7 +79,7 @@ class LocacaoService {
         });
     }
 
-    async finalize(id) {
+    async finalize(id, usuarioId) {
         const locacaoId = Number(id);
         if (!Number.isInteger(locacaoId) || locacaoId <= 0) {
             throw new LocacaoDadoInvalidoError("O id da locação deve ser um inteiro positivo.");
@@ -80,9 +87,10 @@ class LocacaoService {
 
         return prisma.$transaction(async (transaction) => {
             const locacao = await transaction.locacao.findUnique({
-                where: { id: locacaoId }
+                where: { id: locacaoId },
+                select: { id: true, veiculoId: true, status: true, dataDevolucao: true, usuarioId: true }
             });
-            if (!locacao) {
+            if (!locacao || locacao.usuarioId !== usuarioId) {
                 throw new LocacaoNaoEncontradaError();
             }
             if (locacao.status !== "ATIVA" || locacao.dataDevolucao) {
@@ -90,7 +98,7 @@ class LocacaoService {
             }
 
             const finalizacao = await transaction.locacao.updateMany({
-                where: { id: locacaoId, status: "ATIVA", dataDevolucao: null },
+                where: { id: locacaoId, usuarioId, status: "ATIVA", dataDevolucao: null },
                 data: { status: "FINALIZADA", dataDevolucao: new Date() }
             });
             if (finalizacao.count !== 1) {
